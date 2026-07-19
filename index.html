@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cámara Web</title>
+    <style>
+        body { margin: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        video { width: 100%; max-height: 80vh; object-fit: cover; }
+        #captureBtn { margin-top: 20px; padding: 15px 30px; font-size: 18px; border-radius: 50px; background: #fff; border: none; font-weight: bold; }
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+    <video id="camera" autoplay playsinline></video>
+    <button id="captureBtn">Capturar Foto</button>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const video = document.getElementById('camera');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const captureBtn = document.getElementById('captureBtn');
+
+        // Solicitar cámara trasera a máxima resolución posible
+        const constraints = {
+            video: {
+                facingMode: { exact: "environment" },
+                width: { ideal: 4000 },
+                height: { ideal: 3000 }
+            }
+        };
+
+        navigator.mediaDevices.getUserMedia(constraints)
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => { alert("Error accediendo a la cámara: " + err); });
+
+        captureBtn.addEventListener('click', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const link = document.createElement('a');
+            link.download = `foto_${Date.now()}.jpg`;
+            // Calidad al 100%
+            link.href = canvas.toDataURL('image/jpeg', 1.0);
+            link.click();
+        });
+    </script>
+</body>
+  </html>
+
