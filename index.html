@@ -2,51 +2,92 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cámara Web</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cámara PWA</title>
     <style>
-        body { margin: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-        video { width: 100%; max-height: 80vh; object-fit: cover; }
-        #captureBtn { margin-top: 20px; padding: 15px 30px; font-size: 18px; border-radius: 50px; background: #fff; border: none; font-weight: bold; }
+        body { margin: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100vh; font-family: sans-serif; }
+        video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        .controls { position: relative; z-index: 2; display: flex; gap: 30px; margin-bottom: 40px; background: rgba(0,0,0,0.4); padding: 15px 30px; border-radius: 40px; }
+        button { width: 70px; height: 70px; border-radius: 50%; border: 4px solid #fff; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 28px; padding: 0; outline: none; }
+        #btnPhoto { background: #fff; }
+        #btnVideo { background: #ff3b30; border-color: #ff3b30; color: white; }
+        .recording { animation: pulse 1s infinite; background: #cc0000 !important; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
         canvas { display: none; }
     </style>
 </head>
 <body>
-    <video id="camera" autoplay playsinline></video>
-    <button id="captureBtn">Capturar Foto</button>
+    <video id="viewfinder" autoplay playsinline></video>
+    
+    <div class="controls">
+        <button id="btnPhoto" aria-label="Tomar Foto"></button>
+        <button id="btnVideo" aria-label="Grabar Video">📹</button>
+    </div>
     <canvas id="canvas"></canvas>
 
     <script>
-        const video = document.getElementById('camera');
+        const video = document.getElementById('viewfinder');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const captureBtn = document.getElementById('captureBtn');
+        const btnVideo = document.getElementById('btnVideo');
+        
+        let stream, mediaRecorder, recordedChunks = [];
+        let isRecording = false;
 
-        // Solicitar cámara trasera a máxima resolución posible
-        const constraints = {
-            video: {
-                facingMode: { exact: "environment" },
-                width: { ideal: 4000 },
-                height: { ideal: 3000 }
+        // Solicitar cámara trasera a máxima resolución ideal
+        async function initCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { exact: "environment" }, width: { ideal: 3840 }, height: { ideal: 2160 } },
+                    audio: true
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                // Fallback de seguridad si falla la cámara trasera específica
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                video.srcObject = stream;
+            }
+        }
+
+        // Función: Tomar Foto
+        document.getElementById('btnPhoto').onclick = () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/jpeg', 1.0);
+            link.download = 'IMG_' + Date.now() + '.jpg';
+            link.click();
+        };
+
+        // Función: Grabar Video
+        btnVideo.onclick = function() {
+            if (!isRecording) {
+                recordedChunks = [];
+                // Iniciar grabación
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'VID_' + Date.now() + '.mp4';
+                    link.click();
+                };
+                
+                mediaRecorder.start();
+                this.classList.add('recording');
+                isRecording = true;
+            } else {
+                // Detener grabación
+                mediaRecorder.stop();
+                this.classList.remove('recording');
+                isRecording = false;
             }
         };
 
-        navigator.mediaDevices.getUserMedia(constraints)
-            .then(stream => { video.srcObject = stream; })
-            .catch(err => { alert("Error accediendo a la cámara: " + err); });
-
-        captureBtn.addEventListener('click', () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            const link = document.createElement('a');
-            link.download = `foto_${Date.now()}.jpg`;
-            // Calidad al 100%
-            link.href = canvas.toDataURL('image/jpeg', 1.0);
-            link.click();
-        });
+        initCamera();
     </script>
 </body>
-  </html>
-
+</html>
